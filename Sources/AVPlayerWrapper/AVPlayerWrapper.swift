@@ -29,6 +29,8 @@ public class AVPlayerWrapper: NSObject {
     private var timeObserverToken: Any?
     
     // MARK: - Public variables
+    static public let shared = AVPlayerWrapper()
+    
     public var playlist: [URL] = []
     
     public var isPlaying: Bool {
@@ -38,16 +40,8 @@ public class AVPlayerWrapper: NSObject {
     // MARK: - Callbacks
     public weak var delegate: AVPlayerWrapperDelegate?
     
-    // MARK: - Init
-    override public init() {
-        super.init()
-    }
     
-    deinit {
-        if let token = timeObserverToken {
-            player?.removeTimeObserver(token)
-        }
-    }
+    private override init() {}
 }
 
 // MARK: - Public methods
@@ -79,6 +73,7 @@ public extension AVPlayerWrapper {
     }
     
     public func play() {
+        print("player - \(player)")
         player?.play()
         delegate?.didStartPlaying()
     }
@@ -91,6 +86,12 @@ public extension AVPlayerWrapper {
     public func stop() {
         player?.pause()
         player?.seek(to: .zero)
+        
+        if let token = timeObserverToken {
+            player?.removeTimeObserver(token)
+            timeObserverToken = nil
+        }
+        
         delegate?.didStop()
     }
     
@@ -116,19 +117,29 @@ private extension AVPlayerWrapper {
         }
         playerItem = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: playerItem)
-        
+        print("loadTrack")
         getCurrentDuration { duration in
+            print("loadTrack duration - \(duration)")
             self.delegate?.didUpdateTime(currentTime: CMTime(), duration: duration ?? CMTime())
             self.timeObserverToken = self.player?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak self] time in
                 guard let self = self,
                       let currentItem = self.playerItem else {
                     return
                 }
+                print("loadTrack currentItem - \(currentItem)")
                 self.delegate?.didUpdateTime(currentTime: time, duration: duration ?? CMTime())
             }
         }
         
         NotificationCenter.default.addObserver(self, selector: #selector(playerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
+        
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: playerItem, queue: .main) { notification in
+            if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
+                print("Failed to play to end time: \(error.localizedDescription)")
+            } else {
+                print("Failed to play to end time.")
+            }
+        }
     }
     
     func getCurrentDuration(callback: ((_: CMTime?) -> Void)?) {

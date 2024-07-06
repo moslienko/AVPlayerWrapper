@@ -8,7 +8,7 @@
 import Foundation
 
 enum ExampleType: CaseIterable {
-    case singleLocal, singleUrl, playlistRemote
+    case singleLocal, singleUrl, player
     
     var title: String {
         switch self {
@@ -16,8 +16,8 @@ enum ExampleType: CaseIterable {
             return "Play single local file"
         case .singleUrl:
             return "Play single remote file"
-        case .playlistRemote:
-            return "Playlist with multiple remote files"
+        case .player:
+            return "Player with playlists remote files"
         }
     }
 }

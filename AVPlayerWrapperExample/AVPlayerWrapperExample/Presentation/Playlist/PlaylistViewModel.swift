@@ -10,7 +10,7 @@ import Foundation
 
 final class PlaylistViewModel {
     
-    let musicPlayer = AVPlayerWrapper()
+    let musicPlayer = AVPlayerWrapper.shared
     var musicUrls: [URL] = []
     
     init() {

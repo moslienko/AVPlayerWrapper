@@ -6,11 +6,13 @@
 //
 
 import UIKit
+import AVPlayerWrapper
+import AVFoundation
 
 final class ExamplesListViewController: UIViewController {
     
     let viewModel = ExamplesListViewModel()
-    
+    var audioPlayer: AVAudioPlayer?
     // MARK: - UI components
     lazy var tableView: UITableView = {
         let tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -26,6 +28,11 @@ final class ExamplesListViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         tableView.reloadData()
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        viewModel.musicPlayer.stop()
     }
 }
 
@@ -48,13 +55,21 @@ private extension ExamplesListViewController {
         ])
     }
     
+    
     func handleExample(_ example: ExampleType) {
+        
         switch example {
         case .singleLocal:
-            break
+            if let url = Bundle.main.createFileUrl(forResource: "sos.mp3") {
+                viewModel.musicPlayer.setPlaylist([url])
+                viewModel.musicPlayer.play()
+            }
         case .singleUrl:
-            break
-        case .playlistRemote:
+            if let url = URL(string: "http://webaudioapi.com/samples/audio-tag/chrono.mp3") {
+                viewModel.musicPlayer.setPlaylist([url])
+                viewModel.musicPlayer.play()
+            }
+        case .player:
             let vc = PlaylistViewController()
             self.navigationController?.pushViewController(vc, animated: true)
         }
