@@ -100,7 +100,8 @@ final class PlaylistViewController: UIViewController {
     }
     
     func reloadData() {
-        viewModel.musicPlayer.setPlaylist(viewModel.musicUrls)
+        viewModel.musicPlayer.setPlaylist(viewModel.musicFiles)
+        viewModel.musicPlayer.options.isDisplayNowPlaying = true
     }
 }
 

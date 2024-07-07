@@ -55,18 +55,19 @@ private extension ExamplesListViewController {
         ])
     }
     
-    
     func handleExample(_ example: ExampleType) {
         
         switch example {
         case .singleLocal:
             if let url = Bundle.main.createFileUrl(forResource: "sos.mp3") {
-                viewModel.musicPlayer.setPlaylist([url])
+                viewModel.musicPlayer.setPlaylist([AVPlayerWrapperMediaFile(fileUrl: url)])
+                viewModel.musicPlayer.options.isDisplayNowPlaying = false
                 viewModel.musicPlayer.play()
             }
         case .singleUrl:
             if let url = URL(string: "http://webaudioapi.com/samples/audio-tag/chrono.mp3") {
-                viewModel.musicPlayer.setPlaylist([url])
+                viewModel.musicPlayer.setPlaylist([AVPlayerWrapperMediaFile(fileUrl: url)])
+                viewModel.musicPlayer.options.isDisplayNowPlaying = false
                 viewModel.musicPlayer.play()
             }
         case .player:
