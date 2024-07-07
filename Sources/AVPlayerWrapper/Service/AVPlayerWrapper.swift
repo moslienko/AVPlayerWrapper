@@ -28,10 +28,31 @@ public class AVPlayerWrapper: NSObject {
     private var currentTrackIndex = 0
     private var timeObserverToken: Any?
     
+    lazy var nowPlayingService: NowPlayingService = {
+        let service: NowPlayingService = NowPlayingService(
+            delegate: self,
+            didPlayButtonTapped: {
+                self.play()
+            },
+            didPauseButtonTapped: {
+                self.pause()
+            },
+            didPrevTrackButtonTapped: {
+                self.playPreviousTrack()
+            },
+            didNextTrackButtonTapped: {
+                self.playNextTrack()
+            }
+        )
+        
+        return service
+    }()
+    
     // MARK: - Public variables
     static public let shared = AVPlayerWrapper()
     
-    public var playlist: [URL] = []
+    public var playlist: [AVPlayerWrapperMediaFile] = []
+    public var options: AVPlayerOptions
     
     public var isPlaying: Bool {
         return player?.isPlaying ?? false
@@ -40,8 +61,9 @@ public class AVPlayerWrapper: NSObject {
     // MARK: - Callbacks
     public weak var delegate: AVPlayerWrapperDelegate?
     
-    
-    private override init() {}
+    private override init() {
+        options = AVPlayerOptions(isDisplayNowPlaying: false)
+    }
 }
 
 // MARK: - Public methods
@@ -52,14 +74,14 @@ public extension AVPlayerWrapper {
             return
         }
         currentTrackIndex = index
+        stop()
         loadTrack(at: index)
-        player?.play()
-        delegate?.didStartPlaying()
+        play()
         delegate?.didSwitchToTrack(index: index)
     }
     
     public func playNextTrack() {
-        if currentTrackIndex + 1 < playlist.count {
+        if isCanPlayedNextAudio() {
             playTrack(at: currentTrackIndex + 1)
         } else {
             stop()
@@ -67,15 +89,21 @@ public extension AVPlayerWrapper {
     }
     
     public func playPreviousTrack() {
-        if currentTrackIndex > 0 {
+        if isCanPlayedPrevAudio() {
             playTrack(at: currentTrackIndex - 1)
         }
     }
     
     public func play() {
-        print("player - \(player)")
-        player?.play()
-        delegate?.didStartPlaying()
+        if options.isDisplayNowPlaying {
+            self.nowPlayingService.setupNowPlaying {
+                self.player?.play()
+                self.delegate?.didStartPlaying()
+            }
+        } else {
+            self.player?.play()
+            self.delegate?.didStartPlaying()
+        }
     }
     
     public func pause() {
@@ -92,6 +120,16 @@ public extension AVPlayerWrapper {
             timeObserverToken = nil
         }
         
+        _ = MPRemoteCommandCenter.shared().stopCommand
+        UIApplication.shared.endReceivingRemoteControlEvents()
+        
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        do {
+            try AVAudioSession.sharedInstance().setActive(false)
+        } catch {
+            print("Error with setup AV session: \(error)")
+        }
+        nowPlayingService.dismissRemoteCenter()
         delegate?.didStop()
     }
     
@@ -99,12 +137,20 @@ public extension AVPlayerWrapper {
         player?.seek(to: time)
     }
     
-    public func setPlaylist(_ urls: [URL]) {
-        playlist = urls
+    public func setPlaylist(_ files: [AVPlayerWrapperMediaFile]) {
+        playlist = files
         currentTrackIndex = 0
-        if !urls.isEmpty {
+        if !files.isEmpty {
             loadTrack(at: 0)
         }
+    }
+    
+    public func isCanPlayedPrevAudio() -> Bool {
+        currentTrackIndex > 0
+    }
+    
+    public func isCanPlayedNextAudio() -> Bool {
+        currentTrackIndex + 1 < playlist.count
     }
 }
 
@@ -112,13 +158,14 @@ public extension AVPlayerWrapper {
 private extension AVPlayerWrapper {
     
     private func loadTrack(at index: Int) {
-        guard let url = playlist[safe: index] else {
+        guard let url = playlist[safe: index]?.fileUrl else {
             return
         }
         playerItem = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: playerItem)
+        setupAVAudioSession()
         print("loadTrack")
-        getCurrentDuration { duration in
+        self.getCurrentDuration { duration in
             print("loadTrack duration - \(duration)")
             self.delegate?.didUpdateTime(currentTime: CMTime(), duration: duration ?? CMTime())
             self.timeObserverToken = self.player?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak self] time in
@@ -126,18 +173,17 @@ private extension AVPlayerWrapper {
                       let currentItem = self.playerItem else {
                     return
                 }
-                print("loadTrack currentItem - \(currentItem)")
                 self.delegate?.didUpdateTime(currentTime: time, duration: duration ?? CMTime())
             }
         }
         
-        NotificationCenter.default.addObserver(self, selector: #selector(playerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: self.playerItem)
         
-        NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: playerItem, queue: .main) { notification in
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: self.playerItem, queue: .main) { notification in
             if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
-                print("Failed to play to end time: \(error.localizedDescription)")
+                print("failed to play to end time - \(error.localizedDescription)")
             } else {
-                print("Failed to play to end time.")
+                print("failed to play to end time")
             }
         }
     }
@@ -169,5 +215,44 @@ private extension AVPlayerWrapper {
     func playerDidFinishPlaying() {
         delegate?.didFinishPlaying()
         playNextTrack()
+    }
+}
+
+// MARK: - Player in command center and lockscreen
+private extension AVPlayerWrapper {
+    
+    func setupAVAudioSession() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(options.session.category, mode: options.session.mode, options: options.session.options)
+            try AVAudioSession.sharedInstance().setActive(true)
+            
+            UIApplication.shared.beginReceivingRemoteControlEvents()
+        } catch {
+            print("Failed to set up AVAudioSession: \(error)")
+        }
+    }
+}
+
+// MARK: - NowPlayingServiceDelegate
+extension AVPlayerWrapper: NowPlayingServiceDelegate {
+    
+    public func isPlayedNow() -> Bool {
+        isPlaying
+    }
+    
+    public func getCurrentMediaFile() -> AVPlayerWrapperMediaFile? {
+        playlist[safe: currentTrackIndex]
+    }
+    
+    public func getPlayerAssetCurrentTime() -> Double? {
+        playerItem?.currentTime().seconds
+    }
+    
+    public func getPlayerAssetDuration() -> Double? {
+        playerItem?.asset.duration.seconds
+    }
+    
+    public func getPlayerRate() -> Float? {
+        player?.rate
     }
 }
