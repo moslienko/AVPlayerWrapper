@@ -19,6 +19,13 @@ extension DecorateWrapper where Element: UIButton {
             $0.layer.cornerRadius = 32
         }
     }
+    
+    static func seekButtonStyle() -> DecorateWrapper {
+        .wrap {
+            $0.tintColor = .label
+            $0.backgroundColor = .clear
+        }
+    }
 }
 
 final class PlaylistViewController: UIViewController {
@@ -87,6 +94,28 @@ final class PlaylistViewController: UIViewController {
         return label
     }()
     
+    lazy var seekBackButton: UIButton = {
+        let button = AppButton(type: .system)
+        button.apply(.seekButtonStyle())
+        button.setImage(UIImage(systemName: "gobackward.5"), for: [])
+        button.addAction {
+            self.seekBackTapped()
+        }
+        
+        return button
+    }()
+    
+    lazy var seekForwardButton: UIButton = {
+        let button = AppButton(type: .system)
+        button.apply(.seekButtonStyle())
+        button.setImage(UIImage(systemName: "goforward.15"), for: [])
+        button.addAction {
+            self.seekForwardTapped()
+        }
+        
+        return button
+    }()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -116,6 +145,8 @@ private extension PlaylistViewController {
         view.addSubview(playPauseButton)
         view.addSubview(previousTrackButton)
         view.addSubview(nextTrackButton)
+        view.addSubview(seekBackButton)
+        view.addSubview(seekForwardButton)
         view.addSubview(seekSlider)
         view.addSubview(currentTimeLabel)
         view.addSubview(durationLabel)
@@ -126,6 +157,8 @@ private extension PlaylistViewController {
     func layoutUI() {
         playPauseButton.translatesAutoresizingMaskIntoConstraints = false
         nextTrackButton.translatesAutoresizingMaskIntoConstraints = false
+        seekBackButton.translatesAutoresizingMaskIntoConstraints = false
+        seekForwardButton.translatesAutoresizingMaskIntoConstraints = false
         previousTrackButton.translatesAutoresizingMaskIntoConstraints = false
         seekSlider.translatesAutoresizingMaskIntoConstraints = false
         currentTimeLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -146,6 +179,16 @@ private extension PlaylistViewController {
             nextTrackButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
             nextTrackButton.widthAnchor.constraint(equalToConstant: 64.0),
             nextTrackButton.heightAnchor.constraint(equalToConstant: 64.0),
+            
+            seekBackButton.trailingAnchor.constraint(equalTo: previousTrackButton.leadingAnchor, constant: -20),
+            seekBackButton.centerYAnchor.constraint(equalTo: previousTrackButton.centerYAnchor),
+            seekBackButton.widthAnchor.constraint(equalToConstant: 42.0),
+            seekBackButton.heightAnchor.constraint(equalToConstant: 42.0),
+            
+            seekForwardButton.leadingAnchor.constraint(equalTo: nextTrackButton.trailingAnchor, constant: 20),
+            seekForwardButton.centerYAnchor.constraint(equalTo: nextTrackButton.centerYAnchor),
+            seekForwardButton.widthAnchor.constraint(equalToConstant: 42.0),
+            seekForwardButton.heightAnchor.constraint(equalToConstant: 42.0),
             
             seekSlider.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             seekSlider.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
@@ -173,6 +216,15 @@ private extension PlaylistViewController {
     
     func previousTrackTapped() {
         viewModel.musicPlayer.playPreviousTrack()
+    }
+    
+    func seekBackTapped() {
+        viewModel.musicPlayer.seekBackward(by: 5)
+    }
+    
+    func seekForwardTapped() {
+        print("seekForwardTapped..")
+        viewModel.musicPlayer.seekForward(by: 15)
     }
     
     @objc

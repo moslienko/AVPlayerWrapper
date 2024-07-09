@@ -177,6 +177,29 @@ public extension AVPlayerWrapper {
         player?.seek(to: time)
     }
     
+
+    public func seekForward(by seconds: TimeInterval) {
+        guard let player = player,
+              let currentTime = player.currentItem?.currentTime() else {
+            return
+        }
+        let newTime = CMTimeGetSeconds(currentTime) + seconds
+        let time = CMTimeMakeWithSeconds(newTime, preferredTimescale: currentTime.timescale)
+        
+        player.seek(to: time)
+    }
+    
+    public func seekBackward(by seconds: TimeInterval) {
+        guard let player = player,
+              let currentTime = player.currentItem?.currentTime() else {
+            return
+        }
+        let newTime = CMTimeGetSeconds(currentTime) - seconds
+        let time = CMTimeMakeWithSeconds(newTime, preferredTimescale: currentTime.timescale)
+        
+        player.seek(to: time)
+    }
+    
     public func setPlaylist(
         _ files: [AVPlayerWrapperMediaFile],
         didStartPlaying: Callback? = nil,
