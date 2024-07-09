@@ -30,6 +30,7 @@ public class AVPlayerWrapper: NSObject {
     private var playerItem: AVPlayerItem?
     private var currentTrackIndex = 0
     private var timeObserverToken: Any?
+    private var stopTimer: Timer?
     
     private lazy var nowPlayingService: NowPlayingService = {
         let service: NowPlayingService = NowPlayingService(
@@ -63,6 +64,7 @@ public class AVPlayerWrapper: NSObject {
     
     public var playlist: [AVPlayerWrapperMediaFile] = []
     public var options: AVPlayerOptions
+    public private(set) var autoStopType: AVPlayerAutoStopType = .disable
     
     public var isPlaying: Bool {
         return player?.isPlaying ?? false
@@ -177,7 +179,24 @@ public extension AVPlayerWrapper {
         player?.seek(to: time)
     }
     
-
+    public func setPlaybackRate(to rate: Float) {
+        guard let player = player else { return }
+        player.rate = max(0.5, min(rate, 2.0))
+    }
+    
+    public func setupAutoStop(with type: AVPlayerAutoStopType) {
+        print("setupAutoStop - \(type)")
+        self.autoStopType = type
+        switch type {
+        case .disable, .afterTrackEnd:
+            stopTimer?.invalidate()
+            stopTimer = nil
+        case let .after(seconds):
+            stopTimer?.invalidate()
+            stopTimer = Timer.scheduledTimer(timeInterval: seconds, target: self, selector: #selector(stopPlayingAfterTimer), userInfo: nil, repeats: false)
+        }
+    }
+    
     public func seekForward(by seconds: TimeInterval) {
         guard let player = player,
               let currentTime = player.currentItem?.currentTime() else {
@@ -254,6 +273,7 @@ private extension AVPlayerWrapper {
                                 context: &playerItemContext)
         
         player = AVPlayer(playerItem: playerItem)
+        player?.currentItem?.audioTimePitchAlgorithm = .timeDomain
         setupAVAudioSession()
         
         self.getCurrentDuration { duration in
@@ -336,7 +356,33 @@ private extension AVPlayerWrapper {
             self?.didFinishPlaying?()
             self?.delegate?.didFinishPlaying()
         }
-        playNextTrack()
+        
+        if case let AVPlayerAutoStopType.afterTrackEnd = self.autoStopType {
+            print("actionAfterAutoStopped - \(options.actionAfterAutoStopped)")
+            switch options.actionAfterAutoStopped {
+            case .pauseCurrentTrack:
+                pause()
+            case .pauseAndLoadNextTrack:
+                pause()
+                if isCanPlayedNextAudio() {
+                    loadTrack(at: currentTrackIndex + 1)
+                }
+            case .resetCurrentTrack:
+                pause()
+                loadTrack(at: currentTrackIndex)
+            case .stop:
+                stopPlayingAfterTimer()
+            }
+        } else {
+            playNextTrack()
+        }
+    }
+    
+    @objc
+    func stopPlayingAfterTimer() {
+        stop()
+        stopTimer?.invalidate()
+        stopTimer = nil
     }
     
     public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {

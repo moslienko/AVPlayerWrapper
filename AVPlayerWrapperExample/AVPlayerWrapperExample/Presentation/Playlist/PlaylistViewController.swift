@@ -20,7 +20,7 @@ extension DecorateWrapper where Element: UIButton {
         }
     }
     
-    static func seekButtonStyle() -> DecorateWrapper {
+    static func smallIconButtonStyle() -> DecorateWrapper {
         .wrap {
             $0.tintColor = .label
             $0.backgroundColor = .clear
@@ -66,6 +66,22 @@ final class PlaylistViewController: UIViewController {
         return button
     }()
     
+    lazy var speedTrackButton: UIButton = {
+        let button = AppButton(type: .system)
+        button.apply(.smallIconButtonStyle())
+        button.showsMenuAsPrimaryAction = true
+        configureSpeedTrackButton(button)
+        return button
+    }()
+    
+    lazy var autoStopButton: UIButton = {
+        let button = AppButton(type: .system)
+        button.apply(.smallIconButtonStyle())
+        button.showsMenuAsPrimaryAction = true
+        configureAutoStopButton(button)
+        return button
+    }()
+    
     lazy var seekSlider: UISlider = {
         let slider = UISlider()
         slider.addTarget(self, action: #selector(seekSliderChanged(_:)), for: .valueChanged)
@@ -96,7 +112,7 @@ final class PlaylistViewController: UIViewController {
     
     lazy var seekBackButton: UIButton = {
         let button = AppButton(type: .system)
-        button.apply(.seekButtonStyle())
+        button.apply(.smallIconButtonStyle())
         button.setImage(UIImage(systemName: "gobackward.5"), for: [])
         button.addAction {
             self.seekBackTapped()
@@ -107,7 +123,7 @@ final class PlaylistViewController: UIViewController {
     
     lazy var seekForwardButton: UIButton = {
         let button = AppButton(type: .system)
-        button.apply(.seekButtonStyle())
+        button.apply(.smallIconButtonStyle())
         button.setImage(UIImage(systemName: "goforward.15"), for: [])
         button.addAction {
             self.seekForwardTapped()
@@ -150,7 +166,9 @@ private extension PlaylistViewController {
         view.addSubview(seekSlider)
         view.addSubview(currentTimeLabel)
         view.addSubview(durationLabel)
-        
+        view.addSubview(speedTrackButton)
+        view.addSubview(autoStopButton)
+
         layoutUI()
     }
     
@@ -163,7 +181,9 @@ private extension PlaylistViewController {
         seekSlider.translatesAutoresizingMaskIntoConstraints = false
         currentTimeLabel.translatesAutoresizingMaskIntoConstraints = false
         durationLabel.translatesAutoresizingMaskIntoConstraints = false
-        
+        speedTrackButton.translatesAutoresizingMaskIntoConstraints = false
+        autoStopButton.translatesAutoresizingMaskIntoConstraints = false
+
         NSLayoutConstraint.activate([
             playPauseButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             playPauseButton.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -50),
@@ -198,8 +218,70 @@ private extension PlaylistViewController {
             currentTimeLabel.topAnchor.constraint(equalTo: seekSlider.bottomAnchor, constant: 10),
             
             durationLabel.trailingAnchor.constraint(equalTo: seekSlider.trailingAnchor),
-            durationLabel.topAnchor.constraint(equalTo: seekSlider.bottomAnchor, constant: 10)
+            durationLabel.topAnchor.constraint(equalTo: seekSlider.bottomAnchor, constant: 10),
+            
+            speedTrackButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: 20),
+            speedTrackButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            speedTrackButton.widthAnchor.constraint(equalToConstant: 42.0),
+            speedTrackButton.heightAnchor.constraint(equalToConstant: 42.0),
+            
+            autoStopButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: 20),
+            autoStopButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            autoStopButton.widthAnchor.constraint(equalToConstant: 42.0),
+            autoStopButton.heightAnchor.constraint(equalToConstant: 42.0)
         ])
+    }
+    
+    func configureSpeedTrackButton(_ button: UIButton) {
+        let rate = self.viewModel.musicPlayer.getPlayerRate() ?? 1.0
+        button.setTitle(String(rate), for: [])
+        
+        var childrens: [UIMenuElement] = []
+        let values: [Float] = [0.75, 1, 1.25, 1.5, 1.75, 2]
+        values.forEach { value in
+            let action = UIAction(
+                title: "\(value) x",
+                image: rate == value ? UIImage(systemName: "checkmark") : nil
+            ) { _ in
+                self.viewModel.musicPlayer.setPlaybackRate(to: value)
+                self.configureSpeedTrackButton(button)
+            }
+            childrens.append(action)
+        }
+        
+        button.menu = UIMenu(children: childrens)
+    }
+    
+    func configureAutoStopButton(_ button: UIButton) {
+        let type = self.viewModel.musicPlayer.autoStopType
+        button.setTitle(getTitle(for: type), for: [])
+        
+        var childrens: [UIMenuElement] = []
+        let values: [AVPlayerAutoStopType] = [.afterTrackEnd, .after(15), .after(30), .after(60), .disable]
+        values.forEach { value in
+            let title = getTitle(for: value)
+            let action = UIAction(
+                title: title,
+                image: getTitle(for: type) == title ? UIImage(systemName: "checkmark") : nil
+            ) { _ in
+                self.viewModel.musicPlayer.setupAutoStop(with: value)
+                self.configureAutoStopButton(button)
+            }
+            childrens.append(action)
+        }
+        
+        button.menu = UIMenu(children: childrens)
+        
+        func getTitle(for type: AVPlayerAutoStopType) -> String {
+            switch type {
+            case .disable:
+                return "Off"
+            case .afterTrackEnd:
+                return "After the end of the track"
+            case let .after(seconds):
+                return "After \(seconds)"
+            }
+        }
     }
 }
 
