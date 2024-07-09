@@ -31,7 +31,6 @@ public class NowPlayingService {
     var didPrevTrackButtonTapped: Callback?
     var didNextTrackButtonTapped: Callback?
     
-    
     // MARK: - Init
     public init(delegate: NowPlayingServiceDelegate?,
                 didPlayButtonTapped: Callback? = nil,

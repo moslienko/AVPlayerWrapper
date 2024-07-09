@@ -7,6 +7,7 @@
 
 import AppViewUtilits
 import AVFoundation
+import MediaPlayer
 import AVPlayerWrapper
 import UIKit
 
@@ -221,13 +222,19 @@ extension PlaylistViewController: AVPlayerWrapperDelegate {
         playPauseButton.setImage(UIImage(systemName: "play.fill"), for: [])
     }
     
-    func didUpdateTime(currentTime: CMTime, duration: CMTime) {
+    
+    func didSwitchToTrack(index: Int) {
+        previousTrackButton.isEnabled = index > 0
+        nextTrackButton.isEnabled = index < viewModel.musicPlayer.playlist.count - 1
+    }
+    
+    func didUpdateTime(time: AVAssetTime) {
         var currentSeconds: Float64 {
-            let val = CMTimeGetSeconds(currentTime)
+            let val = CMTimeGetSeconds(time.currentTime)
             return val.isNaN ? 0.0 : val
         }
         var durationSeconds: Float64 {
-            let val = CMTimeGetSeconds(duration)
+            let val = CMTimeGetSeconds(time.duration)
             return val.isNaN ? 0.0 : val
         }
         
@@ -238,8 +245,24 @@ extension PlaylistViewController: AVPlayerWrapperDelegate {
         durationLabel.text = formatTime(seconds: durationSeconds)
     }
     
-    func didSwitchToTrack(index: Int) {
-        previousTrackButton.isEnabled = index > 0
-        nextTrackButton.isEnabled = index < viewModel.musicPlayer.playlist.count - 1
+    func didUpdateStatus(status: AVPlayerItem.Status) {
+        switch status {
+        case .unknown:
+            print("Player status - unknown")
+        case .readyToPlay:
+            print("Player status - ready")
+        case .failed:
+            print("Player status - failed")
+        @unknown default:
+            break
+        }
+    }
+    
+    func didHandleError(error: Error?) {
+        print("Player error - \(String(describing: error?.localizedDescription))")
+    }
+    
+    func didFailedSetAudioSession(error: Error?) {
+        print("Failed set session - \(String(describing: error?.localizedDescription))")
     }
 }

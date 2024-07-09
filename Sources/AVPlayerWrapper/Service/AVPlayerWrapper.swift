@@ -16,8 +16,11 @@ public protocol AVPlayerWrapperDelegate: AnyObject {
     func didPause()
     func didStop()
     func didFinishPlaying()
-    func didUpdateTime(currentTime: CMTime, duration: CMTime)
+    func didUpdateTime(time: AVAssetTime)
     func didSwitchToTrack(index: Int)
+    func didUpdateStatus(status: AVPlayerItem.Status)
+    func didHandleError(error: Error?)
+    func didFailedSetAudioSession(error: Error?)
 }
 
 public class AVPlayerWrapper: NSObject {
@@ -28,7 +31,7 @@ public class AVPlayerWrapper: NSObject {
     private var currentTrackIndex = 0
     private var timeObserverToken: Any?
     
-    lazy var nowPlayingService: NowPlayingService = {
+    private lazy var nowPlayingService: NowPlayingService = {
         let service: NowPlayingService = NowPlayingService(
             delegate: self,
             didPlayButtonTapped: {
@@ -48,6 +51,13 @@ public class AVPlayerWrapper: NSObject {
         return service
     }()
     
+    // Key-value observing context
+    private var playerItemContext = 0
+    private let requiredAssetKeys = [
+        "playable",
+        "hasProtectedContent"
+    ]
+    
     // MARK: - Public variables
     static public let shared = AVPlayerWrapper()
     
@@ -61,6 +71,17 @@ public class AVPlayerWrapper: NSObject {
     // MARK: - Callbacks
     public weak var delegate: AVPlayerWrapperDelegate?
     
+    public var didStartPlaying: Callback?
+    public var didPause: Callback?
+    public var didStop: Callback?
+    public var didFinishPlaying: Callback?
+    public var didUpdateTime: DataCallback<AVAssetTime>?
+    public var didSwitchToTrack: DataCallback<Int>?
+    public var didUpdateStatus: DataCallback<AVPlayerItem.Status>?
+    public var didHandleError: DataCallback<Error?>?
+    public var didFailedSetAudioSession: DataCallback<Error?>?
+    
+    // MARK: - Init
     private override init() {
         options = AVPlayerOptions(isDisplayNowPlaying: false)
     }
@@ -77,7 +98,10 @@ public extension AVPlayerWrapper {
         stop()
         loadTrack(at: index)
         play()
-        delegate?.didSwitchToTrack(index: index)
+        onMainThread { [weak self] in
+            self?.didSwitchToTrack?(index)
+            self?.delegate?.didSwitchToTrack(index: index)
+        }
     }
     
     public func playNextTrack() {
@@ -98,17 +122,26 @@ public extension AVPlayerWrapper {
         if options.isDisplayNowPlaying {
             self.nowPlayingService.setupNowPlaying {
                 self.player?.play()
-                self.delegate?.didStartPlaying()
+                onMainThread { [weak self] in
+                    self?.didStartPlaying?()
+                    self?.delegate?.didStartPlaying()
+                }
             }
         } else {
             self.player?.play()
-            self.delegate?.didStartPlaying()
+            onMainThread { [weak self] in
+                self?.didStartPlaying?()
+                self?.delegate?.didStartPlaying()
+            }
         }
     }
     
     public func pause() {
         player?.pause()
-        delegate?.didPause()
+        onMainThread { [weak self] in
+            self?.didPause?()
+            self?.delegate?.didPause()
+        }
     }
     
     public func stop() {
@@ -127,19 +160,48 @@ public extension AVPlayerWrapper {
         do {
             try AVAudioSession.sharedInstance().setActive(false)
         } catch {
-            print("Error with setup AV session: \(error)")
+            onMainThread { [weak self] in
+                self?.didFailedSetAudioSession?(error)
+                self?.delegate?.didFailedSetAudioSession(error: error)
+            }
         }
+        
         nowPlayingService.dismissRemoteCenter()
-        delegate?.didStop()
+        onMainThread { [weak self] in
+            self?.didStop?()
+            self?.delegate?.didStop()
+        }
     }
     
     public func seek(to time: CMTime) {
         player?.seek(to: time)
     }
     
-    public func setPlaylist(_ files: [AVPlayerWrapperMediaFile]) {
+    public func setPlaylist(
+        _ files: [AVPlayerWrapperMediaFile],
+        didStartPlaying: Callback? = nil,
+        didPause: Callback? = nil,
+        didStop: Callback? = nil,
+        didFinishPlaying: Callback? = nil,
+        didUpdateTime: DataCallback<AVAssetTime>? = nil,
+        didSwitchToTrack: DataCallback<Int>? = nil,
+        didUpdateStatus: DataCallback<AVPlayerItem.Status>? = nil,
+        didHandleError: DataCallback<Error?>? = nil,
+        didFailedSetAudioSession: DataCallback<Error?>? = nil
+    ) {
         playlist = files
         currentTrackIndex = 0
+        
+        self.didStartPlaying = didStartPlaying
+        self.didPause = didPause
+        self.didStop = didStop
+        self.didFinishPlaying = didFinishPlaying
+        self.didUpdateTime = didUpdateTime
+        self.didSwitchToTrack = didSwitchToTrack
+        self.didUpdateStatus = didUpdateStatus
+        self.didHandleError = didHandleError
+        self.didFailedSetAudioSession = didFailedSetAudioSession
+        
         if !files.isEmpty {
             loadTrack(at: 0)
         }
@@ -157,35 +219,54 @@ public extension AVPlayerWrapper {
 // MARK: - Private methods
 private extension AVPlayerWrapper {
     
-    private func loadTrack(at index: Int) {
+    func loadTrack(at index: Int) {
         guard let url = playlist[safe: index]?.fileUrl else {
             return
         }
+        
         playerItem = AVPlayerItem(url: url)
+        playerItem?.addObserver(self,
+                                forKeyPath: #keyPath(AVPlayerItem.status),
+                                options: [.old, .new],
+                                context: &playerItemContext)
+        
         player = AVPlayer(playerItem: playerItem)
         setupAVAudioSession()
-        print("loadTrack")
+        
         self.getCurrentDuration { duration in
-            print("loadTrack duration - \(duration)")
-            self.delegate?.didUpdateTime(currentTime: CMTime(), duration: duration ?? CMTime())
+            onMainThread { [weak self] in
+                let timeModel = AVAssetTime(currentTime: CMTime(), duration: duration ?? CMTime())
+                self?.didUpdateTime?(timeModel)
+                self?.delegate?.didUpdateTime(time: timeModel)
+            }
             self.timeObserverToken = self.player?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: CMTimeScale(NSEC_PER_SEC)), queue: .main) { [weak self] time in
                 guard let self = self,
                       let currentItem = self.playerItem else {
                     return
                 }
-                self.delegate?.didUpdateTime(currentTime: time, duration: duration ?? CMTime())
+                onMainThread { [weak self] in
+                    let timeModel = AVAssetTime(currentTime: time, duration: duration ?? CMTime())
+                    self?.didUpdateTime?(timeModel)
+                    self?.delegate?.didUpdateTime(time: timeModel)
+                }
             }
         }
-        
+        setupObservers()
+    }
+    
+    func setupObservers() {
         NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: self.playerItem)
         
         NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: self.playerItem, queue: .main) { notification in
-            if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
-                print("failed to play to end time - \(error.localizedDescription)")
-            } else {
-                print("failed to play to end time")
+            let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
+            onMainThread { [weak self] in
+                self?.didHandleError?(error)
+                self?.delegate?.didHandleError(error: error)
             }
         }
+        
+        self.player?.addObserver(self, forKeyPath: #keyPath(AVPlayer.status), options: [.new, .initial], context: nil)
+        self.player?.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status), options:[.new, .initial], context: nil)
     }
     
     func getCurrentDuration(callback: ((_: CMTime?) -> Void)?) {
@@ -211,15 +292,6 @@ private extension AVPlayerWrapper {
         }
     }
     
-    @objc
-    func playerDidFinishPlaying() {
-        delegate?.didFinishPlaying()
-        playNextTrack()
-    }
-}
-
-// MARK: - Player in command center and lockscreen
-private extension AVPlayerWrapper {
     
     func setupAVAudioSession() {
         do {
@@ -227,8 +299,48 @@ private extension AVPlayerWrapper {
             try AVAudioSession.sharedInstance().setActive(true)
             
             UIApplication.shared.beginReceivingRemoteControlEvents()
-        } catch {
-            print("Failed to set up AVAudioSession: \(error)")
+        } catch let error {
+            onMainThread { [weak self] in
+                self?.didFailedSetAudioSession?(error)
+                self?.delegate?.didFailedSetAudioSession(error: error)
+            }
+        }
+    }
+    
+    @objc
+    func playerDidFinishPlaying() {
+        onMainThread { [weak self] in
+            self?.didFinishPlaying?()
+            self?.delegate?.didFinishPlaying()
+        }
+        playNextTrack()
+    }
+    
+    public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        if keyPath == "status" {
+            guard let status = self.player?.currentItem?.status else {
+                return
+            }
+            var value = true
+            switch status.rawValue {
+            case 1:
+                value = false
+            default:
+                value = true
+            }
+            
+            if keyPath == #keyPath(AVPlayerItem.status) {
+                let status: AVPlayerItem.Status
+                if let statusNumber = change?[.newKey] as? NSNumber {
+                    status = AVPlayerItem.Status(rawValue: statusNumber.intValue) ?? .unknown
+                } else {
+                    status = .unknown
+                }
+                onMainThread { [weak self] in
+                    self?.didUpdateStatus?(status)
+                    self?.delegate?.didUpdateStatus(status: status)
+                }
+            }
         }
     }
 }
