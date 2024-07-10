@@ -356,7 +356,6 @@ extension PlaylistViewController: AVPlayerWrapperDelegate {
         playPauseButton.setImage(UIImage(systemName: "play.fill"), for: [])
     }
     
-    
     func didSwitchToTrack(index: Int) {
         previousTrackButton.isEnabled = index > 0
         nextTrackButton.isEnabled = index < viewModel.musicPlayer.playlist.count - 1
@@ -377,6 +376,18 @@ extension PlaylistViewController: AVPlayerWrapperDelegate {
         
         currentTimeLabel.text = formatTime(seconds: currentSeconds)
         durationLabel.text = formatTime(seconds: durationSeconds)
+    }
+    
+    func didUpdateAutoStopTime(seconds: TimeInterval) {
+        let title = formatTime(seconds: seconds)
+        UIView.performWithoutAnimation {
+            self.autoStopButton.setTitle(title, for: [])
+            self.autoStopButton.layoutIfNeeded()
+        }
+    }
+    
+    func didUpdateAutoStopType(_ type: AVPlayerAutoStopType) {
+        configureAutoStopButton(autoStopButton)
     }
     
     func didUpdateStatus(status: AVPlayerItem.Status) {

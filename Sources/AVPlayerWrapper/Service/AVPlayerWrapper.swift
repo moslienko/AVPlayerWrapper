@@ -17,6 +17,8 @@ public protocol AVPlayerWrapperDelegate: AnyObject {
     func didStop()
     func didFinishPlaying()
     func didUpdateTime(time: AVAssetTime)
+    func didUpdateAutoStopTime(seconds: TimeInterval)
+    func didUpdateAutoStopType(_ type: AVPlayerAutoStopType)
     func didSwitchToTrack(index: Int)
     func didUpdateStatus(status: AVPlayerItem.Status)
     func didHandleError(error: Error?)
@@ -30,7 +32,8 @@ public class AVPlayerWrapper: NSObject {
     private var playerItem: AVPlayerItem?
     private var currentTrackIndex = 0
     private var timeObserverToken: Any?
-    private var stopTimer: Timer?
+    private var autoStopTimer: Timer?
+    private var remainingTime: TimeInterval = 0
     
     private lazy var nowPlayingService: NowPlayingService = {
         let service: NowPlayingService = NowPlayingService(
@@ -78,6 +81,8 @@ public class AVPlayerWrapper: NSObject {
     public var didStop: Callback?
     public var didFinishPlaying: Callback?
     public var didUpdateTime: DataCallback<AVAssetTime>?
+    public var didUpdateAutoStopTime: DataCallback<TimeInterval>?
+    public var didUpdateAutoStopType: DataCallback<AVPlayerAutoStopType>?
     public var didSwitchToTrack: DataCallback<Int>?
     public var didUpdateStatus: DataCallback<AVPlayerItem.Status>?
     public var didHandleError: DataCallback<Error?>?
@@ -124,6 +129,7 @@ public extension AVPlayerWrapper {
         if options.isDisplayNowPlaying {
             self.nowPlayingService.setupNowPlaying {
                 self.player?.play()
+                self.configureAutoStopTimer()
                 onMainThread { [weak self] in
                     self?.didStartPlaying?()
                     self?.delegate?.didStartPlaying()
@@ -131,6 +137,7 @@ public extension AVPlayerWrapper {
             }
         } else {
             self.player?.play()
+            self.configureAutoStopTimer()
             onMainThread { [weak self] in
                 self?.didStartPlaying?()
                 self?.delegate?.didStartPlaying()
@@ -140,6 +147,7 @@ public extension AVPlayerWrapper {
     
     public func pause() {
         player?.pause()
+        autoStopTimer?.invalidate()
         onMainThread { [weak self] in
             self?.didPause?()
             self?.delegate?.didPause()
@@ -185,15 +193,14 @@ public extension AVPlayerWrapper {
     }
     
     public func setupAutoStop(with type: AVPlayerAutoStopType) {
-        print("setupAutoStop - \(type)")
         self.autoStopType = type
         switch type {
         case .disable, .afterTrackEnd:
-            stopTimer?.invalidate()
-            stopTimer = nil
+            autoStopTimer?.invalidate()
+            autoStopTimer = nil
         case let .after(seconds):
-            stopTimer?.invalidate()
-            stopTimer = Timer.scheduledTimer(timeInterval: seconds, target: self, selector: #selector(stopPlayingAfterTimer), userInfo: nil, repeats: false)
+            remainingTime = seconds
+            configureAutoStopTimer()
         }
     }
     
@@ -335,7 +342,6 @@ private extension AVPlayerWrapper {
         }
     }
     
-    
     func setupAVAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setCategory(options.session.category, mode: options.session.mode, options: options.session.options)
@@ -350,6 +356,15 @@ private extension AVPlayerWrapper {
         }
     }
     
+    
+    func configureAutoStopTimer() {
+        autoStopTimer?.invalidate()
+        autoStopTimer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(updateRemainingTime), userInfo: nil, repeats: true)
+        if let autoStopTimer = autoStopTimer {
+            RunLoop.main.add(autoStopTimer, forMode: .common)
+        }
+    }
+    
     @objc
     func playerDidFinishPlaying() {
         onMainThread { [weak self] in
@@ -358,7 +373,7 @@ private extension AVPlayerWrapper {
         }
         
         if case let AVPlayerAutoStopType.afterTrackEnd = self.autoStopType {
-            print("actionAfterAutoStopped - \(options.actionAfterAutoStopped)")
+            autoStopType = .disable
             switch options.actionAfterAutoStopped {
             case .pauseCurrentTrack:
                 pause()
@@ -381,8 +396,31 @@ private extension AVPlayerWrapper {
     @objc
     func stopPlayingAfterTimer() {
         stop()
-        stopTimer?.invalidate()
-        stopTimer = nil
+        autoStopTimer?.invalidate()
+        autoStopTimer = nil
+        autoStopType = .disable
+        onMainThread { [weak self] in
+            guard let strongSelf = self else {
+                return
+            }
+            strongSelf.didUpdateAutoStopType?(strongSelf.autoStopType)
+            strongSelf.delegate?.didUpdateAutoStopType(strongSelf.autoStopType)
+        }
+    }
+    
+    @objc
+    func updateRemainingTime() {
+        remainingTime -= 1
+        onMainThread { [weak self] in
+            guard let strongSelf = self else {
+                return
+            }
+            strongSelf.didUpdateAutoStopTime?(strongSelf.remainingTime)
+            strongSelf.delegate?.didUpdateAutoStopTime(seconds: strongSelf.remainingTime)
+        }
+        if remainingTime <= 0 {
+            stopPlayingAfterTimer()
+        }
     }
     
     public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
