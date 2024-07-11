@@ -253,7 +253,7 @@ private extension PlaylistViewController {
     }
     
     func configureAutoStopButton(_ button: UIButton) {
-        let type = self.viewModel.musicPlayer.autoStopType
+        let type = self.viewModel.musicPlayer.getAutoStopType()
         button.setTitle(getTitle(for: type), for: [])
         
         var childrens: [UIMenuElement] = []

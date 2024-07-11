@@ -14,7 +14,7 @@ final class PlaylistViewModel {
     var musicFiles: [AVPlayerWrapperMediaFile] = []
     
     init() {
-        if let url = URL(string: "http://webaudioapi.com/samples/audio-tag/chrono.mp3"),
+        if let url = URL(string: "http://webaudioapi.com/samples/audio-tag/Zchrono.mp3"),
            let coverURL = URL(string: "https://developer.apple.com/wwdc24/images/motion/axiju/endframe-small_2x.jpg")
         {
             musicFiles += [AVPlayerWrapperMediaFile(fileUrl: url, title: "Chrono", coverUrl: coverURL)]
