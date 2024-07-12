@@ -10,6 +10,7 @@ import Foundation
 
 final class ExamplesListViewModel {
     
-    let musicPlayer = AVPlayerWrapper.shared
+    let singleMusicPlayer = AVPlayerWrapper()
+    let remoteMusicPlayer = AVPlayerWrapper()
     let examples = ExampleType.allCases
 }

@@ -114,8 +114,9 @@ public class AVPlayerWrapper: NSObject {
     public var didFailedSetAudioSession: DataCallback<Error?>?
     
     // MARK: - Init
-    private override init() {
+    public override init() {
         options = AVPlayerOptions(isDisplayNowPlaying: false)
+        super.init()
     }
 }
 
@@ -151,6 +152,8 @@ public extension AVPlayerWrapper {
     }
     
     public func play() {
+        print("play")
+
         if options.isDisplayNowPlaying {
             self.nowPlayingService.setupNowPlaying {
                 self.player?.play()
@@ -171,6 +174,7 @@ public extension AVPlayerWrapper {
     }
     
     public func pause() {
+        print("pause")
         player?.pause()
         autoStopService.pauseTimer()
         onMainThread { [weak self] in

@@ -49,13 +49,15 @@ public extension AVPlayerAutoStopService {
     }
     
     public func startTimer() {
+        print("AVPlayerAutoStopType - \( self.autoStopType)")
         guard case let AVPlayerAutoStopType.disable = self.autoStopType else {
+            autoStopTimer?.invalidate()
+            autoStopTimer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(updateRemainingTime), userInfo: nil, repeats: true)
+            if let autoStopTimer = autoStopTimer {
+                RunLoop.main.add(autoStopTimer, forMode: .common)
+            }
+            
             return
-        }
-        autoStopTimer?.invalidate()
-        autoStopTimer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(updateRemainingTime), userInfo: nil, repeats: true)
-        if let autoStopTimer = autoStopTimer {
-            RunLoop.main.add(autoStopTimer, forMode: .common)
         }
     }
     

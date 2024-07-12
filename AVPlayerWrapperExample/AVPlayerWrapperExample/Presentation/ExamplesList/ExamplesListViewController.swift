@@ -32,7 +32,8 @@ final class ExamplesListViewController: UIViewController {
     
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        viewModel.musicPlayer.stop()
+        viewModel.singleMusicPlayer.stop()
+        viewModel.remoteMusicPlayer.stop()
     }
 }
 
@@ -60,15 +61,17 @@ private extension ExamplesListViewController {
         switch example {
         case .singleLocal:
             if let url = Bundle.main.createFileUrl(forResource: "sos.mp3") {
-                viewModel.musicPlayer.setPlaylist([AVPlayerWrapperMediaFile(fileUrl: url)])
-                viewModel.musicPlayer.options.isDisplayNowPlaying = false
-                viewModel.musicPlayer.play()
+                viewModel.remoteMusicPlayer.stop()
+                viewModel.singleMusicPlayer.setPlaylist([AVPlayerWrapperMediaFile(fileUrl: url)])
+                viewModel.singleMusicPlayer.options.isDisplayNowPlaying = false
+                viewModel.singleMusicPlayer.play()
             }
         case .singleUrl:
             if let url = URL(string: "http://webaudioapi.com/samples/audio-tag/chrono.mp3") {
-                viewModel.musicPlayer.setPlaylist([AVPlayerWrapperMediaFile(fileUrl: url)])
-                viewModel.musicPlayer.options.isDisplayNowPlaying = false
-                viewModel.musicPlayer.play()
+                viewModel.singleMusicPlayer.stop()
+                viewModel.remoteMusicPlayer.setPlaylist([AVPlayerWrapperMediaFile(fileUrl: url)])
+                viewModel.remoteMusicPlayer.options.isDisplayNowPlaying = false
+                viewModel.remoteMusicPlayer.play()
             }
         case .player:
             let vc = PlaylistViewController()
