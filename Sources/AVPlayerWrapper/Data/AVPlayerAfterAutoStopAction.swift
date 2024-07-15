@@ -7,6 +7,18 @@
 
 import Foundation
 
+/// An enum representing the actions to be taken after the auto-stop for AVPlayer.
 public enum AVPlayerAfterAutoStopAction {
-    case pauseCurrentTrack, pauseAndLoadNextTrack, resetCurrentTrack, stop
+    
+    /// Pause the current track.
+    case pauseCurrentTrack
+    
+    /// Pause and load the next track.
+    case pauseAndLoadNextTrack
+    
+    /// Reset the current track.
+    case resetCurrentTrack
+    
+    /// Stop playback.
+    case stop
 }

@@ -11,29 +11,70 @@ import Foundation
 import MediaPlayer
 import UIKit
 
+/// A protocol that defines the delegate methods for the AVPlayerWrapper.
 public protocol AVPlayerWrapperDelegate: AnyObject {
+    
+    /// Called when playback starts.
     func didStartPlaying()
+    
+    /// Called when playback is paused.
     func didPause()
+    
+    /// Called when playback is stopped.
     func didStop()
+    
+    /// Called when playback finished.
     func didFinishPlaying()
+    
+    /// Called when the playback time is updated.
+    /// - Parameter time: The current playback time.
     func didUpdateTime(time: AVAssetTime)
+    
+    /// Called when the remaining auto-stop time is updated.
+    /// - Parameter seconds: The remaining time in seconds.
     func didUpdateAutoStopTime(seconds: TimeInterval)
+    
+    /// Called when the auto-stop type is updated.
+    /// - Parameter type: The new auto-stop type.
     func didUpdateAutoStopType(_ type: AVPlayerAutoStopType)
+    
+    /// Called when the track is switched.
+    /// - Parameter index: The index of the new track.
     func didSwitchToTrack(index: Int)
+    
+    /// Called when the status of the player item is updated.
+    /// - Parameter status: The new status.
     func didUpdateStatus(status: AVPlayerItem.Status)
+    
+    /// Called when an error is handled.
+    /// - Parameter error: The error that occurred.
     func didHandleError(error: Error?)
+    
+    /// Called when setting the audio session fails.
+    /// - Parameter error: The error that occurred during setting the audio session.
     func didFailedSetAudioSession(error: Error?)
 }
 
+/// A wrapper class for AVPlayer
 public class AVPlayerWrapper: NSObject {
     
     // MARK: - Private variables
+    
+    /// The underlying AVPlayer instance.
     private var player: AVPlayer?
+    
+    /// The current AVPlayerItem being played.
     private var playerItem: AVPlayerItem?
+    
+    /// The index of the current track in the playlist.
     private var currentTrackIndex = 0
+    
+    /// The token for the time observer.
     private var timeObserverToken: Any?
-        
+    
     // MARK: - Services
+    
+    /// The default service for managing now playing information.
     private lazy var defaultNowPlayingService: NowPlayingInfoCenterService = {
         let service: NowPlayingService = NowPlayingService(
             delegate: self,
@@ -54,8 +95,11 @@ public class AVPlayerWrapper: NSObject {
         return service
     }()
     
+    
+    /// The service for managing auto-stop functionality.
     private lazy var autoStopService: AVPlayerAutoStopService = {
         let service: AVPlayerAutoStopService = AVPlayerAutoStopService(
+            delegate: self,
             didStop: {
                 self.stop()
             },
@@ -83,19 +127,31 @@ public class AVPlayerWrapper: NSObject {
     }()
     
     // Key-value observing context
+    
+    /// Key-value observing context for player item.
     private var playerItemContext = 0
+    
+    /// The asset keys required for playing.
     private let requiredAssetKeys = [
         "playable",
         "hasProtectedContent"
     ]
     
     // MARK: - Public variables
+    
+    /// The shared singleton instance of AVPlayerWrapper.
     static public let shared = AVPlayerWrapper()
     
+    /// The playlist of media files to be played.
     public var playlist: [AVPlayerWrapperMediaFile] = []
+    
+    /// The options for the AVPlayerWrapper.
     public var options: AVPlayerOptions
+    
+    /// The service for managing now playing information.
     public var nowPlayingService: NowPlayingInfoCenterService?
-
+    
+    /// Indicates whether the player is currently playing.
     public var isPlaying: Bool {
         return player?.isPlaying ?? false
     }
@@ -103,19 +159,42 @@ public class AVPlayerWrapper: NSObject {
     // MARK: - Callbacks
     public weak var delegate: AVPlayerWrapperDelegate?
     
+    /// A callback that gets invoked when playback starts.
     public var didStartPlaying: Callback?
+    
+    /// A callback that gets invoked when playback is paused.
     public var didPause: Callback?
+    
+    /// A callback that gets invoked when playback is stopped.
     public var didStop: Callback?
+    
+    /// A callback that gets invoked when playback finishes.
     public var didFinishPlaying: Callback?
+    
+    /// A callback that gets invoked when the playback time is updated.
     public var didUpdateTime: DataCallback<AVAssetTime>?
+    
+    /// A callback that gets invoked when the remaining auto-stop time is updated.
     public var didUpdateAutoStopTime: DataCallback<TimeInterval>?
+    
+    /// A callback that gets invoked when the auto-stop type is updated.
     public var didUpdateAutoStopType: DataCallback<AVPlayerAutoStopType>?
+    
+    /// A callback that gets invoked when the track is switched.
     public var didSwitchToTrack: DataCallback<Int>?
+    
+    /// A callback that gets invoked when the status of the player item is updated.
     public var didUpdateStatus: DataCallback<AVPlayerItem.Status>?
+    
+    /// A callback that gets invoked when an error is handled.
     public var didHandleError: DataCallback<Error?>?
+    
+    /// A callback that gets invoked when setting the audio session fails.
     public var didFailedSetAudioSession: DataCallback<Error?>?
     
     // MARK: - Init
+    
+    /// Initializes a new instance of AVPlayerWrapper with default options and services.
     public override init() {
         self.options = AVPlayerOptions(isDisplayNowPlaying: false)
         super.init()
@@ -126,6 +205,8 @@ public class AVPlayerWrapper: NSObject {
 // MARK: - Public methods
 public extension AVPlayerWrapper {
     
+    /// Plays the track at the specified index in the playlist.
+    /// - Parameter index: The index of the track to be played.
     public func playTrack(at index: Int) {
         guard index < playlist.count else {
             return
@@ -140,6 +221,7 @@ public extension AVPlayerWrapper {
         }
     }
     
+    /// Plays the next track in the playlist.
     public func playNextTrack() {
         if isCanPlayedNextAudio() {
             playTrack(at: currentTrackIndex + 1)
@@ -148,15 +230,15 @@ public extension AVPlayerWrapper {
         }
     }
     
+    /// Plays the previous track in the playlist.
     public func playPreviousTrack() {
         if isCanPlayedPrevAudio() {
             playTrack(at: currentTrackIndex - 1)
         }
     }
     
+    /// Starts playback of the current track.
     public func play() {
-        print("play")
-
         if options.isDisplayNowPlaying, let nowPlayingService = self.nowPlayingService {
             nowPlayingService.setupNowPlaying {
                 startPlaying()
@@ -175,8 +257,8 @@ public extension AVPlayerWrapper {
         }
     }
     
+    /// Pauses playback of the current track.
     public func pause() {
-        print("pause")
         player?.pause()
         autoStopService.pauseTimer()
         onMainThread { [weak self] in
@@ -185,6 +267,7 @@ public extension AVPlayerWrapper {
         }
     }
     
+    /// Stops playback of the current track.
     public func stop() {
         player?.pause()
         player?.seek(to: .zero)
@@ -195,6 +278,7 @@ public extension AVPlayerWrapper {
             player?.removeTimeObserver(token)
             timeObserverToken = nil
         }
+        removeObservers()
         
         _ = MPRemoteCommandCenter.shared().stopCommand
         UIApplication.shared.endReceivingRemoteControlEvents()
@@ -216,19 +300,27 @@ public extension AVPlayerWrapper {
         }
     }
     
+    /// Seeks to the specified time in the current track.
+    /// - Parameter time: The time to seek to.
     public func seek(to time: CMTime) {
         player?.seek(to: time)
     }
     
+    /// Sets the playback rate of the player.
+    /// - Parameter rate: The new playback rate.
     public func setPlaybackRate(to rate: Float) {
         guard let player = player else { return }
         player.rate = max(0.5, min(rate, 2.0))
     }
     
+    /// Sets up the auto-stop feature with the specified type.
+    /// - Parameter type: The type of auto-stop to be set.
     public func setupAutoStop(with type: AVPlayerAutoStopType) {
         autoStopService.setupAutoStop(with: type)
     }
     
+    /// Seeks forward by the specified number of seconds in the current track.
+    /// - Parameter seconds: The number of seconds to seek forward.
     public func seekForward(by seconds: TimeInterval) {
         guard let player = player,
               let currentTime = player.currentItem?.currentTime() else {
@@ -240,6 +332,8 @@ public extension AVPlayerWrapper {
         player.seek(to: time)
     }
     
+    /// Seeks backward by the specified number of seconds in the current track.
+    /// - Parameter seconds: The number of seconds to seek backward.
     public func seekBackward(by seconds: TimeInterval) {
         guard let player = player,
               let currentTime = player.currentItem?.currentTime() else {
@@ -251,6 +345,18 @@ public extension AVPlayerWrapper {
         player.seek(to: time)
     }
     
+    // Sets the playlist and optional callbacks for playback events.
+    /// - Parameters:
+    ///   - files: The array of media files to be set as the playlist.
+    ///   - didStartPlaying: An optional callback to be invoked when playback starts.
+    ///   - didPause: An optional callback to be invoked when playback is paused.
+    ///   - didStop: An optional callback to be invoked when playback is stopped.
+    ///   - didFinishPlaying: An optional callback to be invoked when playback finishes.
+    ///   - didUpdateTime: An optional callback to be invoked when the playback time is updated.
+    ///   - didSwitchToTrack: An optional callback to be invoked when the track is switched.
+    ///   - didUpdateStatus: An optional callback to be invoked when the status of the player item is updated.
+    ///   - didHandleError: An optional callback to be invoked when an error is handled.
+    ///   - didFailedSetAudioSession: An optional callback to be invoked when setting the audio session fails.
     public func setPlaylist(
         _ files: [AVPlayerWrapperMediaFile],
         didStartPlaying: Callback? = nil,
@@ -281,33 +387,36 @@ public extension AVPlayerWrapper {
         }
     }
     
+    /// Indicates whether the previous audio track can be played.
+    /// - Returns: A Boolean value indicating whether the previous audio track can be played.
     public func isCanPlayedPrevAudio() -> Bool {
-        currentTrackIndex > 0
+        return currentTrackIndex > 0
     }
     
+    /// Indicates whether the next audio track can be played.
+    /// - Returns: A Boolean value indicating whether the next audio track can be played.
     public func isCanPlayedNextAudio() -> Bool {
-        currentTrackIndex + 1 < playlist.count
+        return currentTrackIndex + 1 < playlist.count
     }
     
+    /// Gets the current auto-stop type.
+    /// - Returns: The current auto-stop type.
     public func getAutoStopType() -> AVPlayerAutoStopType {
-        autoStopService.autoStopType
+        return autoStopService.autoStopType
     }
 }
 
 // MARK: - Private methods
 private extension AVPlayerWrapper {
     
+    /// Loads the track at the specified index in the playlist.
+    /// - Parameter index: The index of the track to be loaded.
     func loadTrack(at index: Int) {
         guard let url = playlist[safe: index]?.fileUrl else {
             return
         }
         
         playerItem = AVPlayerItem(url: url)
-        playerItem?.addObserver(self,
-                                forKeyPath: #keyPath(AVPlayerItem.status),
-                                options: [.old, .new],
-                                context: &playerItemContext)
-        
         player = AVPlayer(playerItem: playerItem)
         player?.currentItem?.audioTimePitchAlgorithm = .timeDomain
         setupAVAudioSession()
@@ -333,9 +442,10 @@ private extension AVPlayerWrapper {
         setupObservers()
     }
     
+    /// Sets up observers for the player item and playback time.
     func setupObservers() {
+        // Add notification observers
         NotificationCenter.default.addObserver(self, selector: #selector(self.playerDidFinishPlaying), name: .AVPlayerItemDidPlayToEndTime, object: self.playerItem)
-        
         NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: self.playerItem, queue: .main) { notification in
             let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
             onMainThread { [weak self] in
@@ -344,10 +454,29 @@ private extension AVPlayerWrapper {
             }
         }
         
-        self.player?.addObserver(self, forKeyPath: #keyPath(AVPlayer.status), options: [.new, .initial], context: nil)
+        // Add key-value observers
         self.player?.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status), options:[.new, .initial], context: nil)
+        self.playerItem?.addObserver(
+            self,
+            forKeyPath: #keyPath(AVPlayerItem.status),
+            options: [.old, .new, .initial],
+            context: &playerItemContext
+        )
     }
     
+    /// Removes the observers for the notifications and key-value observations set up in `setupObservers`.
+    func removeObservers() {
+        // Remove notification observers
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: self.playerItem)
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: self.playerItem)
+        
+        // Remove key-value observers
+        self.player?.removeObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status))
+        self.playerItem?.removeObserver(self, forKeyPath: #keyPath(AVPlayer.status))
+    }
+    
+    /// Gets the current duration of the player item.
+    /// - Parameter callback: A closure to be executed with the current duration as `CMTime?`.
     func getCurrentDuration(callback: ((_: CMTime?) -> Void)?) {
         guard let playerItem = self.playerItem,
               let player = self.player else {
@@ -371,6 +500,7 @@ private extension AVPlayerWrapper {
         }
     }
     
+    /// Sets up the AVAudioSession for playback.
     func setupAVAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setCategory(options.session.category, mode: options.session.mode, options: options.session.options)
@@ -385,6 +515,7 @@ private extension AVPlayerWrapper {
         }
     }
     
+    /// Handles the event when the player finishes playing the current track.
     @objc
     func playerDidFinishPlaying() {
         onMainThread { [weak self] in
@@ -400,6 +531,8 @@ private extension AVPlayerWrapper {
         handleAutoStopAfterTrackEnd(nextAction: options.actionAfterAutoStopped)
     }
     
+    /// Handles the auto-stop action after the track ends.
+    /// - Parameter nextAction: The action to be taken after the auto-stop.
     func handleAutoStopAfterTrackEnd(nextAction: AVPlayerAfterAutoStopAction) {
         switch options.actionAfterAutoStopped {
         case .pauseCurrentTrack:
@@ -417,6 +550,12 @@ private extension AVPlayerWrapper {
         }
     }
     
+    /// Observes changes in the specified key path for the given object.
+    /// - Parameters:
+    ///   - keyPath: The key path being observed.
+    ///   - object: The object being observed.
+    ///   - change: The dictionary containing the change details.
+    ///   - context: The context for the observation.
     public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
         if keyPath == "status" {
             guard let status = self.player?.currentItem?.status else {
@@ -446,8 +585,8 @@ private extension AVPlayerWrapper {
     }
 }
 
-// MARK: - NowPlayingServiceDelegate
-extension AVPlayerWrapper: NowPlayingServiceDelegate {
+// MARK: - NowPlayingServiceDelegate & AVPlayerAutoStopServiceDelegate
+extension AVPlayerWrapper: NowPlayingServiceDelegate, AVPlayerAutoStopServiceDelegate {
     
     public func isPlayedNow() -> Bool {
         isPlaying

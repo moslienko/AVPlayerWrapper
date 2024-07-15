@@ -7,6 +7,15 @@
 
 import Foundation
 
+/// An enum representing the auto-stop playing types for AVPlayer.
 public enum AVPlayerAutoStopType {
-    case disable, afterTrackEnd, after(_ seconds: TimeInterval)
+    
+    /// Auto-stop is disabled.
+    case disable
+    
+    /// Auto-stop after the current track ends.
+    case afterTrackEnd
+    
+    /// Auto-stop after a specified number of seconds.
+    case after(_ seconds: TimeInterval)
 }

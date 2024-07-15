@@ -254,15 +254,15 @@ private extension PlaylistViewController {
     
     func configureAutoStopButton(_ button: UIButton) {
         let type = self.viewModel.musicPlayer.getAutoStopType()
-        button.setTitle(getTitle(for: type), for: [])
+        button.setTitle(getButtonTitle(for: type), for: [])
         
         var childrens: [UIMenuElement] = []
         let values: [AVPlayerAutoStopType] = [.afterTrackEnd, .after(15), .after(30), .after(60), .disable]
         values.forEach { value in
-            let title = getTitle(for: value)
+            let title = getMenuTitle(for: value)
             let action = UIAction(
                 title: title,
-                image: getTitle(for: type) == title ? UIImage(systemName: "checkmark") : nil
+                image: getMenuTitle(for: type) == title ? UIImage(systemName: "checkmark") : nil
             ) { _ in
                 self.viewModel.musicPlayer.setupAutoStop(with: value)
                 self.configureAutoStopButton(button)
@@ -272,7 +272,7 @@ private extension PlaylistViewController {
         
         button.menu = UIMenu(children: childrens)
         
-        func getTitle(for type: AVPlayerAutoStopType) -> String {
+        func getMenuTitle(for type: AVPlayerAutoStopType) -> String {
             switch type {
             case .disable:
                 return "Off"
@@ -280,6 +280,15 @@ private extension PlaylistViewController {
                 return "After the end of the track"
             case let .after(seconds):
                 return "After \(seconds)"
+            }
+        }
+        
+        func getButtonTitle(for type: AVPlayerAutoStopType) -> String {
+            switch type {
+            case let .after(seconds):
+                return "\(seconds)"
+            default:
+                return getMenuTitle(for: type)
             }
         }
     }

@@ -60,17 +60,17 @@ private extension ExamplesListViewController {
         
         switch example {
         case .singleLocal:
+            viewModel.singleMusicPlayer.options.isDisplayNowPlaying = false
             if let url = Bundle.main.createFileUrl(forResource: "sos.mp3") {
                 viewModel.remoteMusicPlayer.stop()
                 viewModel.singleMusicPlayer.setPlaylist([AVPlayerWrapperMediaFile(fileUrl: url)])
-                viewModel.singleMusicPlayer.options.isDisplayNowPlaying = false
                 viewModel.singleMusicPlayer.play()
             }
         case .singleUrl:
+            viewModel.remoteMusicPlayer.options.isDisplayNowPlaying = false
             if let url = URL(string: "http://webaudioapi.com/samples/audio-tag/chrono.mp3") {
                 viewModel.singleMusicPlayer.stop()
                 viewModel.remoteMusicPlayer.setPlaylist([AVPlayerWrapperMediaFile(fileUrl: url)])
-                viewModel.remoteMusicPlayer.options.isDisplayNowPlaying = false
                 viewModel.remoteMusicPlayer.play()
             }
         case .player:
