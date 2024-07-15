@@ -20,6 +20,11 @@ public protocol NowPlayingServiceDelegate: AnyObject {
     func getPlayerRate() -> Float?
 }
 
+public protocol NowPlayingInfoCenterService {
+    func setupNowPlaying(callback: @escaping (() -> Void))
+    func dismissRemoteCenter()
+}
+
 public class NowPlayingService {
     
     // MARK: - Public variables
@@ -47,9 +52,9 @@ public class NowPlayingService {
 }
 
 // MARK: - Public methods
-public extension NowPlayingService {
+extension NowPlayingService: NowPlayingInfoCenterService {
     
-    func setupNowPlaying(callback: @escaping (() -> Void)) {
+    public func setupNowPlaying(callback: @escaping (() -> Void)) {
         guard let item = self.delegate?.getCurrentMediaFile() else {
             callback()
             return
@@ -69,7 +74,7 @@ public extension NowPlayingService {
         })
     }
     
-    func dismissRemoteCenter() {
+    public func dismissRemoteCenter() {
         let remoteCommandCenter = MPRemoteCommandCenter.shared()
         remoteCommandCenter.playCommand.isEnabled = false
         remoteCommandCenter.pauseCommand.isEnabled = false

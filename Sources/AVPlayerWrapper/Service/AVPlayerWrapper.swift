@@ -32,8 +32,9 @@ public class AVPlayerWrapper: NSObject {
     private var playerItem: AVPlayerItem?
     private var currentTrackIndex = 0
     private var timeObserverToken: Any?
-    
-    private lazy var nowPlayingService: NowPlayingService = {
+        
+    // MARK: - Services
+    private lazy var defaultNowPlayingService: NowPlayingInfoCenterService = {
         let service: NowPlayingService = NowPlayingService(
             delegate: self,
             didPlayButtonTapped: {
@@ -93,7 +94,8 @@ public class AVPlayerWrapper: NSObject {
     
     public var playlist: [AVPlayerWrapperMediaFile] = []
     public var options: AVPlayerOptions
-    
+    public var nowPlayingService: NowPlayingInfoCenterService?
+
     public var isPlaying: Bool {
         return player?.isPlaying ?? false
     }
@@ -115,8 +117,9 @@ public class AVPlayerWrapper: NSObject {
     
     // MARK: - Init
     public override init() {
-        options = AVPlayerOptions(isDisplayNowPlaying: false)
+        self.options = AVPlayerOptions(isDisplayNowPlaying: false)
         super.init()
+        self.nowPlayingService = self.defaultNowPlayingService
     }
 }
 
@@ -154,16 +157,15 @@ public extension AVPlayerWrapper {
     public func play() {
         print("play")
 
-        if options.isDisplayNowPlaying {
-            self.nowPlayingService.setupNowPlaying {
-                self.player?.play()
-                self.autoStopService.startTimer()
-                onMainThread { [weak self] in
-                    self?.didStartPlaying?()
-                    self?.delegate?.didStartPlaying()
-                }
+        if options.isDisplayNowPlaying, let nowPlayingService = self.nowPlayingService {
+            nowPlayingService.setupNowPlaying {
+                startPlaying()
             }
         } else {
+            startPlaying()
+        }
+        
+        func startPlaying() {
             self.player?.play()
             self.autoStopService.startTimer()
             onMainThread { [weak self] in
@@ -207,7 +209,7 @@ public extension AVPlayerWrapper {
             }
         }
         
-        nowPlayingService.dismissRemoteCenter()
+        nowPlayingService?.dismissRemoteCenter()
         onMainThread { [weak self] in
             self?.didStop?()
             self?.delegate?.didStop()
