@@ -200,6 +200,50 @@ public class AVPlayerWrapper: NSObject {
         super.init()
         self.nowPlayingService = self.defaultNowPlayingService
     }
+    
+    // Sets the playlist and optional callbacks for playback events.
+    /// - Parameters:
+    ///   - file: The array of media files to be set as the playlist.
+    ///   - options: Player configuration.
+    ///   - didStartPlaying: An optional callback to be invoked when playback starts.
+    ///   - didPause: An optional callback to be invoked when playback is paused.
+    ///   - didStop: An optional callback to be invoked when playback is stopped.
+    ///   - didFinishPlaying: An optional callback to be invoked when playback finishes.
+    ///   - didUpdateTime: An optional callback to be invoked when the playback time is updated.
+    ///   - didSwitchToTrack: An optional callback to be invoked when the track is switched.
+    ///   - didUpdateStatus: An optional callback to be invoked when the status of the player item is updated.
+    ///   - didHandleError: An optional callback to be invoked when an error is handled.
+    ///   - didFailedSetAudioSession: An optional callback to be invoked when setting the audio session fails.
+    public init(
+        _ file: AVPlayerWrapperMediaFile,
+        options: AVPlayerOptions = AVPlayerOptions(isDisplayNowPlaying: false),
+        didStartPlaying: Callback? = nil,
+        didPause: Callback? = nil,
+        didStop: Callback? = nil,
+        didFinishPlaying: Callback? = nil,
+        didUpdateTime: DataCallback<AVAssetTime>? = nil,
+        didSwitchToTrack: DataCallback<Int>? = nil,
+        didUpdateStatus: DataCallback<AVPlayerItem.Status>? = nil,
+        didHandleError: DataCallback<Error?>? = nil,
+        didFailedSetAudioSession: DataCallback<Error?>? = nil
+    ) {
+        self.playlist = [file]
+        self.currentTrackIndex = 0
+        self.options = options
+
+        self.didStartPlaying = didStartPlaying
+        self.didPause = didPause
+        self.didStop = didStop
+        self.didFinishPlaying = didFinishPlaying
+        self.didUpdateTime = didUpdateTime
+        self.didSwitchToTrack = didSwitchToTrack
+        self.didUpdateStatus = didUpdateStatus
+        self.didHandleError = didHandleError
+        self.didFailedSetAudioSession = didFailedSetAudioSession
+        
+        super.init()
+        self.loadTrack(at: 0)
+    }
 }
 
 // MARK: - Public methods
