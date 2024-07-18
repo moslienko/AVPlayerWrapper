@@ -87,7 +87,7 @@ if let url = Bundle.main.createFileUrl(forResource: "signal.mp3") {
 }
 ```
 
-In the most basic use case, playing a file is realized as follows:
+Playing a file with receiving callbacks and displaying track information in the `MPNowPlayingInfoCenter`:
 
 ```swift
 guard let url = URL(string: "example.com/audio.mp3") else {
