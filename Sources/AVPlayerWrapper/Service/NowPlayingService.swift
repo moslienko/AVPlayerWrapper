@@ -160,10 +160,18 @@ private extension NowPlayingService {
             callback(nowPlayingInfo)
         }
         
-        func setImageInCover(_ image: UIImage) {
-            nowPlayingInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork.init(boundsSize: image.size, requestHandler: { _ -> UIImage in
+        func setImageInCover(_ image: MultiPlatformImage) {
+#if os(iOS)
+            nowPlayingInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork.init(boundsSize: image.size, requestHandler: { _ -> MultiPlatformImage in
                 return image
             })
+#elseif os(macOS)
+            if #available(macOS 10.13.2, *) {
+                nowPlayingInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork.init(boundsSize: image.size, requestHandler: { _ -> MultiPlatformImage in
+                    return image
+                })
+            }
+#endif
         }
     }
     
@@ -171,11 +179,11 @@ private extension NowPlayingService {
     /// - Parameters:
     ///   - url:  The URL from which to fetch the cover img.
     ///   - callback: A fetched image.
-    func fetchRemoteCover(by url: URL, callback: @escaping ((UIImage?) -> Void)) {
+    func fetchRemoteCover(by url: URL, callback: @escaping ((MultiPlatformImage?) -> Void)) {
         let task = URLSession.shared.dataTask(with: url) { (data, response, error) in
             DispatchQueue.main.async {
                 if let data = data {
-                    let image = UIImage(data: data)
+                    let image = MultiPlatformImage(data: data)
                     callback(image)
                 } else {
                     callback(nil)
@@ -188,7 +196,11 @@ private extension NowPlayingService {
     
     /// Set up the remote transport control actions.
     func setupRemoteTransportControls() {
+        
+#if os(iOS)
         UIApplication.shared.beginReceivingRemoteControlEvents()
+        #endif
+        
         let commandCenter = MPRemoteCommandCenter.shared()
         
         commandCenter.nextTrackCommand.isEnabled = self.delegate?.isCanPlayedNextAudio() ?? false

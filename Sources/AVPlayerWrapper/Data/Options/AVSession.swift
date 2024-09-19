@@ -7,8 +7,10 @@
 
 import Foundation
 import AVFAudio
+import AVFoundation
 
-/// A struct representing the AV audio session configuration.
+#if os(iOS)
+/// A struct representing the AV audio session configuration for iOS.
 public struct AVSession {
     
     /// The category of the AV audio session.
@@ -36,3 +38,12 @@ public struct AVSession {
         self.options = options
     }
 }
+#elseif os(macOS)
+/// A struct representing the AV audio session configuration for macOS.
+public struct AVSession {
+    
+    public let audioEngine = AVAudioEngine()
+    
+    public init() {}
+}
+#endif

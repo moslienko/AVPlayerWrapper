@@ -6,7 +6,14 @@
 //
 
 import Foundation
+
+#if os(iOS)
 import UIKit
+public typealias MultiPlatformImage = UIImage
+#elseif os(macOS)
+import AppKit
+public typealias MultiPlatformImage = NSImage
+#endif
 
 /// A class representing a media file for AVPlayer.
 public class AVPlayerWrapperMediaFile {
@@ -21,7 +28,7 @@ public class AVPlayerWrapperMediaFile {
     public var coverUrl: URL?
     
     /// The cover image.
-    public var coverImage: UIImage?
+    public var coverImage: MultiPlatformImage?
     
     /// Initializes a new instance of `AVPlayerWrapperMediaFile`.
     ///
@@ -30,7 +37,7 @@ public class AVPlayerWrapperMediaFile {
     ///   - title: The title of the media file.
     ///   - coverUrl: The URL of the cover image.
     ///   - coverImage: The cover image.
-    public init(fileUrl: URL, title: String? = nil, coverUrl: URL? = nil, coverImage: UIImage? = nil) {
+    public init(fileUrl: URL, title: String? = nil, coverUrl: URL? = nil, coverImage: MultiPlatformImage? = nil) {
         self.fileUrl = fileUrl
         self.title = title
         self.coverUrl = coverUrl
