@@ -101,7 +101,7 @@ public class AVPlayerWrapper: NSObject {
         let service: AVPlayerAutoStopService = AVPlayerAutoStopService(
             delegate: self,
             didStop: {
-                self.stop()
+                self.stop(isNeedCancelAutoStop: true)
             },
             didUpdateAutoStopTime: { remainingTime in
                 onMainThread { [weak self] in
@@ -136,6 +136,9 @@ public class AVPlayerWrapper: NSObject {
         "playable",
         "hasProtectedContent"
     ]
+    
+    /// Counts how many times the current file has been played back
+    private var currentPlayingCount = 0
     
     // MARK: - Public variables
     
@@ -256,7 +259,7 @@ public extension AVPlayerWrapper {
             return
         }
         currentTrackIndex = index
-        stop()
+        stop(isNeedCancelAutoStop: false)
         loadTrack(at: index)
         play()
         onMainThread { [weak self] in
@@ -270,7 +273,7 @@ public extension AVPlayerWrapper {
         if isCanPlayedNextAudio() {
             playTrack(at: currentTrackIndex + 1)
         } else {
-            stop()
+            stop(isNeedCancelAutoStop: true)
         }
     }
     
@@ -312,11 +315,13 @@ public extension AVPlayerWrapper {
     }
     
     /// Stops playback of the current track.
-    public func stop() {
+    public func stop(isNeedCancelAutoStop: Bool = true) {
         player?.pause()
         player?.seek(to: .zero)
-        
-        autoStopService.cancelTimer()
+       
+        if isNeedCancelAutoStop {
+            autoStopService.cancelTimer()
+        }
         removeObservers()
         
 #if os(iOS)
@@ -598,13 +603,44 @@ private extension AVPlayerWrapper {
             self?.didFinishPlaying?()
             self?.delegate?.didFinishPlaying()
         }
-        guard case let AVPlayerAutoStopType.afterTrackEnd = autoStopService.autoStopType else {
-            playNextTrack()
+        
+        guard let file = self.getCurrentMediaFile() else {
+            continuePlayingPlaylist()
             return
         }
         
-        autoStopService.setupAutoStop(with: .disable)
-        handleAutoStopAfterTrackEnd(nextAction: options.actionAfterAutoStopped)
+        switch file.loopType {
+        case .disable:
+            self.currentPlayingCount = 0
+            continuePlayingPlaylist()
+        case .infinitely:
+            playAgainCurrentTrack()
+        case let .times(count):
+            self.currentPlayingCount += 1
+            if self.currentPlayingCount < count {
+                playAgainCurrentTrack()
+            } else {
+                self.currentPlayingCount = 0
+                continuePlayingPlaylist()
+            }
+        }
+        
+        func playAgainCurrentTrack() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + self.options.loopDelay, execute: {
+                self.player?.seek(to: .zero)
+                self.player?.play()
+            })
+        }
+        
+        func continuePlayingPlaylist() {
+            guard case let AVPlayerAutoStopType.afterTrackEnd = autoStopService.autoStopType else {
+                playNextTrack()
+                return
+            }
+            
+            autoStopService.setupAutoStop(with: .disable)
+            handleAutoStopAfterTrackEnd(nextAction: options.actionAfterAutoStopped)
+        }
     }
     
     /// Handles the auto-stop action after the track ends.
@@ -622,7 +658,7 @@ private extension AVPlayerWrapper {
             pause()
             loadTrack(at: currentTrackIndex)
         case .stop:
-            stop()
+            stop(isNeedCancelAutoStop: true)
         }
     }
 }

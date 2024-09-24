@@ -30,6 +30,9 @@ public class AVPlayerWrapperMediaFile {
     /// The cover image.
     public var coverImage: MultiPlatformImage?
     
+    /// Looping of file playback.
+    public var loopType: AVPlayerLoopType
+    
     /// Initializes a new instance of `AVPlayerWrapperMediaFile`.
     ///
     /// - Parameters:
@@ -37,10 +40,12 @@ public class AVPlayerWrapperMediaFile {
     ///   - title: The title of the media file.
     ///   - coverUrl: The URL of the cover image.
     ///   - coverImage: The cover image.
-    public init(fileUrl: URL, title: String? = nil, coverUrl: URL? = nil, coverImage: MultiPlatformImage? = nil) {
+    ///   - loopType: Looping of file playback.
+    public init(fileUrl: URL, title: String? = nil, coverUrl: URL? = nil, coverImage: MultiPlatformImage? = nil, loopType: AVPlayerLoopType = .disable) {
         self.fileUrl = fileUrl
         self.title = title
         self.coverUrl = coverUrl
         self.coverImage = coverImage
+        self.loopType = loopType
     }
 }
