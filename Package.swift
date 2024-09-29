@@ -15,7 +15,7 @@ let package = Package(
             targets: ["AVPlayerWrapper"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/moslienko/AppViewUtilits.git", from: "1.2.6")
+        .package(url: "https://github.com/moslienko/AppViewUtilits.git", from: "1.3.1")
     ],
     targets: [
        .target(
