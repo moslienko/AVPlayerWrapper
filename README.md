@@ -40,7 +40,7 @@ To integrate using Apple's [Swift Package Manager](https://swift.org/package-man
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/moslienko/AVPlayerWrapper.git", from: "1.0.0")
+    .package(url: "https://github.com/moslienko/AVPlayerWrapper.git", from: "1.0.1")
 ]
 ```
 
@@ -74,6 +74,9 @@ class AVPlayerWrapperMediaFile {
 
   /// The cover image.
   var coverImage: UIImage?
+  
+  /// Looping of file playback.
+  var loopType: AVPlayerLoopType
 }
 ```
 
@@ -288,6 +291,9 @@ struct AVPlayerOptions {
 
   /// The AV audio session configuration.
   public var session: AVSession
+  
+  /// Delay for looping playback.
+  public var loopDelay: Double
 }
 ```
 
